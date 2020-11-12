@@ -19,7 +19,6 @@ import (
 	"encoding/base64"
 
 	"github.com/go-errors/errors"
-	"github.com/ipfs/go-ipfs/core/bootstrap"
 	logging "github.com/ipfs/go-log/v2"
 	crypto "github.com/libp2p/go-libp2p-core/crypto"
 	coredisc "github.com/libp2p/go-libp2p-core/discovery"
@@ -57,7 +56,6 @@ type app struct {
 	StreamsMutex    sync.Mutex
 	Out             *bufio.Writer
 	OutChan         chan interface{}
-	Bootstrapper    io.Closer
 	AddedPeers      []peer.AddrInfo
 	UnsafeNoTrustIP bool
 }
@@ -802,25 +800,7 @@ func addrInfoOfString(maddr string) (*peer.AddrInfo, error) {
 }
 
 func (ap *addPeerMsg) run(app *app) (interface{}, error) {
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-	info, err := addrInfoOfString(ap.Multiaddr)
-	if err != nil {
-		return nil, err
-	}
-
-	app.AddedPeers = append(app.AddedPeers, *info)
-	if app.Bootstrapper != nil {
-		app.Bootstrapper.Close()
-	}
-	app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
-
-	if err != nil {
-		return nil, badp2p(err)
-	}
-
-	return "addPeer success", nil
+	return nil, errors.New("addPeer is disabled -- rebootstrap logic needs reimplemented and tested")
 }
 
 type beginAdvertisingMsg struct {
@@ -876,13 +856,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 				Addrs:  addrStrings,
 				Upcall: "discoveredPeer",
 			})
-		}
-	}
-
-	if len(app.AddedPeers) > 0 {
-		app.Bootstrapper, err = bootstrap.Bootstrap(app.P2p.Me, app.P2p.Host, app.P2p.Dht, bootstrap.BootstrapConfigWithPeers(app.AddedPeers))
-		if err != nil {
-			return nil, badp2p(err)
 		}
 	}
 
@@ -1122,7 +1095,7 @@ func main() {
 	logging.SetLogLevel("autorelay", "info") // Logs relayed byte counts spammily
 	logging.SetLogLevel("providers", "debug")
 	logging.SetLogLevel("dht/RtRefreshManager", "warn") // Ping logs are spammy at debug, cpl logs are spammy at info
-	logging.SetLogLevel("dht", "info") // Logs every operation to debug
+	logging.SetLogLevel("dht", "info")                  // Logs every operation to debug
 	logging.SetLogLevel("peerstore", "debug")
 	logging.SetLogLevel("diversityFilter", "debug")
 	logging.SetLogLevel("table", "debug")
